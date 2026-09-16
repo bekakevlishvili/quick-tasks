@@ -71,7 +71,7 @@ jobs:
           security set-key-partition-list -S apple-tool:,apple: -s -k "" build.keychain
           rm "$RUNNER_TEMP/cert.p12"
 
-      - name: Package (universal: Apple Silicon + Intel in one app)
+      - name: "Package (universal: Apple Silicon + Intel in one app)"
         run: |
           args=(. "Quick Tasks" --overwrite --platform=darwin --arch=universal --out=dist
                 --icon=assets/icon.icns
