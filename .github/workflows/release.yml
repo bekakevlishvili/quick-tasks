@@ -35,6 +35,10 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: Use the tag as the app version
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: npm version --no-git-tag-version "${GITHUB_REF_NAME#v}"
       - run: npm run dist
       - name: Zip
         shell: pwsh
@@ -59,6 +63,9 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: Use the tag as the app version
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: npm version --no-git-tag-version "${GITHUB_REF_NAME#v}"
 
       - name: Import signing certificate
         if: env.MAC_CERT_P12 != ''
@@ -123,14 +130,14 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
-          path: assets
+          path: release-assets   # not assets/, which is the repo's icon folder
           merge-multiple: true
       - name: Create GitHub Release with the downloads attached
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          ls -la assets
-          gh release create "$GITHUB_REF_NAME" assets/* \
+          ls -la release-assets
+          gh release create "$GITHUB_REF_NAME" release-assets/* \
             --repo "$GITHUB_REPOSITORY" \
             --title "Quick Tasks $GITHUB_REF_NAME" \
             --notes-file build/RELEASE_NOTES.md

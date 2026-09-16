@@ -1,7 +1,7 @@
 {
   "name": "quick-tasks",
   "productName": "Quick Tasks",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "description": "Hotkey-summoned overlay for capturing to-dos, with notes, steps and repeats per task.",
   "main": "main.js",
   "private": true,
