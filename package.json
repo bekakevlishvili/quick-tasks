@@ -1,0 +1,17 @@
+{
+  "name": "quick-tasks",
+  "productName": "Quick Tasks",
+  "version": "2.1.0",
+  "description": "Hotkey-summoned overlay for capturing to-dos, with notes, steps and repeats per task.",
+  "main": "main.js",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "icons": "node scripts/make-icons.js",
+    "mac": "node scripts/make-mac.js",
+    "dist": "npx @electron/packager . QuickTasks --overwrite --out=dist --icon=assets/icon.ico --ignore=/dist/ --ignore=/scripts/ --ignore=/build/ --ignore=/.github/ --win32metadata.ProductName=\"Quick Tasks\" --win32metadata.FileDescription=\"Quick Tasks\""
+  },
+  "devDependencies": {
+    "electron": "^44.0.0"
+  }
+}
