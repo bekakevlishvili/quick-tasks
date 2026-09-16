@@ -1,0 +1,120 @@
+# Builds the Windows and macOS downloads on GitHub's own runners and attaches them to a GitHub Release.
+#
+# Trigger: push a tag like v2.2.0   (git tag v2.2.0 && git push origin v2.2.0)
+#          or run it by hand from the Actions tab (builds only, no release).
+#
+# macOS signing is optional. Add these repository secrets and the Mac build is signed and notarized,
+# so it opens without any Gatekeeper prompt:
+#   MAC_CERT_P12        base64 of a "Developer ID Application" certificate exported as .p12
+#   MAC_CERT_PASSWORD   the .p12 password
+#   APPLE_ID            the Apple account email
+#   APPLE_APP_PASSWORD  an app-specific password for that account (appleid.apple.com)
+#   APPLE_TEAM_ID       the 10-character team id
+# Without them the build is unsigned and users do the one-time "Open Anyway" step.
+
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  ELECTRON_SKIP_BINARY_DOWNLOAD: 1   # the packager fetches the right platform binary itself
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run dist
+      - name: Zip
+        shell: pwsh
+        run: Compress-Archive -Path dist/QuickTasks-win32-x64 -DestinationPath dist/QuickTasks-windows-x64.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: dist/QuickTasks-windows-x64.zip
+
+  mac:
+    runs-on: macos-latest
+    env:
+      MAC_CERT_P12: ${{ secrets.MAC_CERT_P12 }}
+      MAC_CERT_PASSWORD: ${{ secrets.MAC_CERT_PASSWORD }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      - name: Import signing certificate
+        if: env.MAC_CERT_P12 != ''
+        run: |
+          echo "$MAC_CERT_P12" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security create-keychain -p "" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "" build.keychain
+          security import "$RUNNER_TEMP/cert.p12" -k build.keychain -P "$MAC_CERT_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "" build.keychain
+          rm "$RUNNER_TEMP/cert.p12"
+
+      - name: Package (universal: Apple Silicon + Intel in one app)
+        run: |
+          args=(. "Quick Tasks" --overwrite --platform=darwin --arch=universal --out=dist
+                --icon=assets/icon.icns
+                --app-bundle-id=com.quicktasks.app
+                --app-category-type=public.app-category.productivity
+                --extend-info=build/Info.extend.plist
+                --ignore=/dist/ --ignore=/scripts/ --ignore=/build/ --ignore=/.github/)
+          if [ -n "$MAC_CERT_P12" ]; then
+            echo "Signing and notarizing"
+            args+=(--osx-sign
+                   --osx-notarize.appleId="$APPLE_ID"
+                   --osx-notarize.appleIdPassword="$APPLE_APP_PASSWORD"
+                   --osx-notarize.teamId="$APPLE_TEAM_ID")
+          else
+            echo "No signing secrets: building unsigned"
+          fi
+          npx @electron/packager "${args[@]}"
+
+      - name: Zip (ditto keeps permissions, symlinks and resource forks intact)
+        run: |
+          cd dist
+          ditto -c -k --sequesterRsrc --keepParent "Quick Tasks-darwin-universal/Quick Tasks.app" "Quick Tasks-mac.zip"
+          ls -la "Quick Tasks-mac.zip"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mac
+          path: dist/Quick Tasks-mac.zip
+
+  release:
+    needs: [windows, mac]
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: assets
+          merge-multiple: true
+      - name: Create GitHub Release with the downloads attached
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ls -la assets
+          gh release create "$GITHUB_REF_NAME" assets/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "Quick Tasks $GITHUB_REF_NAME" \
+            --generate-notes
