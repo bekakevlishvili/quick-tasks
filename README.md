@@ -1,5 +1,7 @@
 # Quick Tasks
 
+**Downloads for Windows and Mac:** https://github.com/bekakevlishvili/quick-tasks/releases
+
 A small always-on-top overlay. Press a hotkey from anywhere, type what you just heard, press Enter, hit Esc. Later, open a task to add notes and break it into steps, and tick things off as you go. Tasks you do every day can repeat on their own.
 
 Everything is stored in plain JSON files on your machine. No account, no server, no cost.
